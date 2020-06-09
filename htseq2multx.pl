@@ -30,96 +30,28 @@ my $check_deflines  = 0;
 my $tmp_files       = [];
 my($bcfile,$bcfilefqmx,$stodout,$prefix,$suffix,$format,$gzipin,$deflinesep);
 
-my $OptionHash = {
-                  'version:+'       => \$version,
-                  'h|help:+'        => \$help,
-                  'bcfile=s'        => \$bcfile,
-                  'idxread=i{1,2}'  => $idxread,
-                  'mismatches=i'    => \$mismatches,
-                  'barcodes_at_end' => \$barcodes_at_end,
-                  'prefix=s'        => \$prefix,
-                  'suffix=s'        => \$suffix,
-                  'galaxy'          => \$galaxy,
-                  'sanitize!'       => \$sanitize,
-                  'v|verbose:+'     => \$verbose,
-                  'gzipout'         => \$gzipout,
-                  'split_all'       => \$split_all,
-                  'format=s'        => \$format,
-                  'gzipin'          => \$gzipin,
-                  '<>'              => sub {push(@$fastq_files,$_[0])},
-                  'fastq-multx=s'   => \$fastq_multx,
-                  'debug:+'         => \$debug,
-                  'check-deflines'  => \$check_deflines
-                 };
+main();
 
-processOptions();
-
-##
-## Construct the command
-##
-
-my $command =
-  "$fastq_multx -x -d 1 -B '$bcfilefqmx' -m $mismatches -M $mismatches";
-
-$command .= ($barcodes_at_end ? ' -e' : ' -b');
-$command .= ($check_deflines  ? " -v '$deflinesep'" : '');
-
-#Add the input files and output file templates
-my $templates_str = '';
-foreach my $fqf_index (sort {indexesFirst($a,$b)}
-                       0..$#{$fastq_files})
+sub main
   {
-    $command       .= " '$fastq_files->[$fqf_index]'";
-    $templates_str .= " -o '" . getOutfileTemplate($fqf_index) . "'";
-  }
-$command .= $templates_str;
+    processOptions();
 
-if($debug)
-  {print STDERR ("#$command\n")}
+    my $command = getFastqMultxCommand();
 
-my $producer = new IO::Pipe::Producer();
-my($stdout_handle,$stderr_handle) = $producer->getSystemProducer($command);
+    if($debug)
+      {print STDERR ("#$command\n")}
 
-my $sel = new IO::Select;
-$sel->add($stdout_handle,$stderr_handle);
-my $stdout = '';
-my $make_error_fatal = 0;
-while(my @fhs = $sel->can_read())
-  {
-    foreach my $fh (@fhs)
-      {
-        my $line = <$fh>;
-        unless(defined($line))
-          {
-            $sel->remove($fh);
-            close($fh);
-            next;
-          }
-        if($fh == $stdout_handle)
-          {$stdout .= $line}
-        elsif($fh == $stderr_handle)
-          {
-            #Echo STDERR and exit non-0 if error is fatal
-            if(processSTDERR($line))
-              {$make_error_fatal = 1}
-          }
-      }
-   }
-
-if($? || $make_error_fatal)
-  {
-    print STDERR ("ERROR: fastq-multx command failed",
-                  ($? ? " with a non-zero exit code [$?]" .
-                   ($! =~ /./ ? " and error: $!" : '.') : ':'),
-                  "\n\t$command\n");
-    unless($stdout =~ /\t/)
-      {exit(1)}
+    runFastqMultx($command);
   }
 
-print(fqmx2bcsStdout($stdout,scalar(@$idxread)));
 
 
 
+
+
+##
+## Methods
+##
 
 sub help
   {
@@ -214,6 +146,28 @@ END_HELP2
 
 sub processOptions
   {
+    my $OptionHash = {
+                      'version:+'       => \$version,
+                      'h|help:+'        => \$help,
+                      'bcfile=s'        => \$bcfile,
+                      'idxread=i{1,2}'  => $idxread,
+                      'mismatches=i'    => \$mismatches,
+                      'barcodes_at_end' => \$barcodes_at_end,
+                      'prefix=s'        => \$prefix,
+                      'suffix=s'        => \$suffix,
+                      'galaxy'          => \$galaxy,
+                      'sanitize!'       => \$sanitize,
+                      'v|verbose:+'     => \$verbose,
+                      'gzipout'         => \$gzipout,
+                      'split_all'       => \$split_all,
+                      'format=s'        => \$format,
+                      'gzipin'          => \$gzipin,
+                      '<>'              => sub {push(@$fastq_files,$_[0])},
+                      'fastq-multx=s'   => \$fastq_multx,
+                      'debug:+'         => \$debug,
+                      'check-deflines'  => \$check_deflines
+                     };
+
     if(!GetOptions(%$OptionHash))
       {
         print STDERR ("Unable to parse command line.\n");
@@ -383,6 +337,74 @@ sub processOptions
                       'not exist: ',join(',',@$missing_infiles),"\n");
         exit(1);
       }
+  }
+
+sub getFastqMultxCommand
+  {
+    my $command =
+      "$fastq_multx -x -d 1 -B '$bcfilefqmx' -m $mismatches -M $mismatches";
+
+    $command .= ($barcodes_at_end ? ' -e' : ' -b');
+    $command .= ($check_deflines  ? " -v '$deflinesep'" : '');
+
+    #Add the input files and output file templates
+    my $templates_str = '';
+    foreach my $fqf_index (sort {indexesFirst($a,$b)}
+                           0..$#{$fastq_files})
+      {
+        $command       .= " '$fastq_files->[$fqf_index]'";
+        $templates_str .= " -o '" . getOutfileTemplate($fqf_index) . "'";
+      }
+    $command .= $templates_str;
+
+    return($command);
+  }
+
+#Runs the command and prints stdout/stderr.  Exits as barcode_splitter would.
+sub runFastqMultx
+  {
+    my $command = $_[0];
+
+    my $producer = new IO::Pipe::Producer();
+    my($stdout_handle,$stderr_handle) = $producer->getSystemProducer($command);
+
+    my $sel = new IO::Select;
+    $sel->add($stdout_handle,$stderr_handle);
+    my $stdout = '';
+    my $make_error_fatal = 0;
+    while(my @fhs = $sel->can_read())
+      {
+        foreach my $fh (@fhs)
+          {
+            my $line = <$fh>;
+            unless(defined($line))
+              {
+                $sel->remove($fh);
+                close($fh);
+                next;
+              }
+            if($fh == $stdout_handle)
+              {$stdout .= $line}
+            elsif($fh == $stderr_handle)
+              {
+                #Echo STDERR and exit non-0 if error is fatal
+                if(processSTDERR($line))
+                  {$make_error_fatal = 1}
+              }
+          }
+      }
+
+    if($? || $make_error_fatal)
+      {
+        print STDERR ("ERROR: fastq-multx command failed",
+                      ($? ? " with a non-zero exit code [$?]" .
+                       ($! =~ /./ ? " and error: $!" : '.') : ':'),
+                      "\n\t$command\n");
+        unless($stdout =~ /\t/)
+          {exit(1)}
+      }
+
+    print(fqmx2bcsStdout($stdout,scalar(@$idxread)));
   }
 
 #This detects and converts files input via process substitution, and writes them
