@@ -1,0 +1,6 @@
+Sample	Barcode1	Count	Percent	Files
+BC1	GATCT	5	11.90%	test_output/test_5_BC1-read-*.out.gz
+BC2	ATCGT	12	28.57%	test_output/test_5_BC2-read-*.out.gz
+BC3	GTGAT	9	21.43%	test_output/test_5_BC3-read-*.out.gz
+BC4	TGTCT	1	2.38%	test_output/test_5_BC4-read-*.out.gz
+unmatched	unmatched	15	35.71%	test_output/test_5_unmatched-read-*.out.gz

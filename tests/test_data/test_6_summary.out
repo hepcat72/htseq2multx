@@ -1,0 +1,6 @@
+Sample	Barcode1	Barcode2	Count	Percent	Files
+BC1	GATCT	GATC	5	11.90%	test_output/test_6_BC1-read-*.fastq
+BC2	ATCGT	ATCG	8	19.05%	test_output/test_6_BC2-read-*.fastq
+BC3	GTGAT	GTGA	0	0.00%	test_output/test_6_BC3-read-*.fastq
+BC4	TGTCT	TGTC	1	2.38%	test_output/test_6_BC4-read-*.fastq
+unmatched	unmatched	unmatched	28	66.67%	test_output/test_6_unmatched-read-*.fastq

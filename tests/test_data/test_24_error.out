@@ -1,0 +1,1 @@
+ERROR: The following barcode IDs have identical index sequences in the barcode file: [test_data/barcode_splitter_barcodes_dupes.txt]: [BC1,BC3;BC2,BC4].
