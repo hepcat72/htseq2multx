@@ -53,6 +53,227 @@ sub main
 ## Methods
 ##
 
+sub processOptions
+  {
+    ##
+    ## Parse the command line and handle help/version options
+    ##
+
+    my $OptionHash = {
+                      'version:+'       => \$version,
+                      'h|help:+'        => \$help,
+                      'bcfile=s'        => \$bcfile,
+                      'idxread=i{1,2}'  => $idxread,
+                      'mismatches=i'    => \$mismatches,
+                      'barcodes_at_end' => \$barcodes_at_end,
+                      'prefix=s'        => \$prefix,
+                      'suffix=s'        => \$suffix,
+                      'galaxy'          => \$galaxy,
+                      'sanitize!'       => \$sanitize,
+                      'v|verbose:+'     => \$verbose,
+                      'gzipout'         => \$gzipout,
+                      'split_all'       => \$split_all,
+                      'format=s'        => \$format,
+                      'gzipin'          => \$gzipin,
+                      '<>'              => sub {push(@$fastq_files,$_[0])},
+                      'fastq-multx=s'   => \$fastq_multx,
+                      'debug:+'         => \$debug,
+                      'check-deflines'  => \$check_deflines
+                     };
+
+    if(!GetOptions(%$OptionHash))
+      {
+        print STDERR ("Unable to parse command line.\n");
+        exit(1);
+      }
+
+    #Handle the version option
+    if($version == 1)
+      {print("$BCSVERSION\n")}
+    elsif($version)
+      {print("barcode_splitter, version $BCSVERSION\n",
+             "htseq2multx, version $VERSION\n",
+             "fastq-multx, version $FQMXVERSION\n")}
+    exit(0) if($version);
+
+    #Handle the help option
+    if($help == 1)
+      {help() && exit(0)}
+    elsif($help)
+      {help2() && exit(0)}
+
+    ##
+    ## Ensure basically valid values for required options are supplied
+    ##
+
+    if(scalar(@$fastq_files) == 0)
+      {
+        help(1);
+        print STDERR ("barcode_splitter: error: the following arguments are ",
+                      "required: FILE\n");
+        exit(1);
+      }
+
+    if(scalar(@$idxread) == 0)
+      {
+        help(1);
+        print STDERR ("barcode_splitter: error: Sequence files and at least ",
+                      "one number indicating the indexed file(s) (--idxread) ",
+                      "is required\n");
+        exit(1);
+      }
+
+    if(!defined($bcfile))
+      {
+        help(1);
+        print STDERR ('barcode_splitter: error: Must specify a barcodes file ',
+                      'with "--bcfile" option',"\n");
+        exit(1);
+      }
+    elsif(!-e $bcfile)
+      {
+        #barcode_splitter does not print: help(1);
+        print STDERR ("ERROR: Unable to open barcode file: [Errno 2] No such ",
+                      "file or directory: '$bcfile'\n");
+        exit(1);
+      }
+
+    if(scalar(grep {$_ < 1 || $_ > scalar(@$fastq_files)} @$idxread))
+      {
+        help(1);
+        print STDERR ('barcode_splitter: error: Invalid index read number ',
+                      '("--idxread"), must be between 1 and 1 (the number of ',
+                      "supplied sequence files)\n");
+        exit(1);
+      }
+
+    ##
+    ## Validate the fastq-multx executable
+    ##
+
+    #Validate the executable (partially for security purposes, since this
+    #wrapper may be initiated via a web tool)
+    my ($multx_version,$is_fqmx,$problem) = getMultxVersion($fastq_multx);
+    my $supported_version                 = [split(/\./,$FQMXVERSION)];
+    if($problem =~ /./)
+      {
+        help2();
+        print('ERROR: There is a problem with the fastq-multx executable: ',
+              "[$problem].  Use the --fastq-multx option described above to ",
+              "supply fastq-multx if it is missing from your PATH.\n");
+        exit(1);
+      }
+    elsif(!$is_fqmx)
+      {
+        help2();
+        print('ERROR: The fastq-multx executable appears to not be fastq-',
+              'multx according to the first 2 lines of its usage.  Use the ',
+              "--fastq-multx option described above to supply fastq-multx.\n");
+        exit(1);
+      }
+    elsif(fqmxVersionInsufficient($multx_version,$supported_version))
+      {
+        help2();
+        if(scalar(@$multx_version) < 1)
+          {print STDERR ('Unable to determine fastq-multx version of ',
+                         "executable [$fastq_multx].  Unable to proceed.\n")}
+        else
+          {print STDERR ('Version [',join('.',@$multx_version),
+                         "] of the fastq-multx executable [$fastq_multx] is ",
+                         "unsupported.  Only version [$FQMXVERSION] or higher ",
+                         'is supported.  Use the --fastq-multx option ',
+                         "described above to supply fastq-multx.\n")}
+        exit(1);
+      }
+
+    #Initialize the data structures/hashes used, e.g. index_hash, bchash,
+    #samplehash, and read in & convert eh barcode file
+    my $order = 1;
+    foreach my $fqf_num (@$idxread)
+      {$index_hash->{$fqf_num - 1} = $order++}
+    ($bcfilefqmx,$bchash,$samplehash) =
+      bcs2fqmxBCFile($bcfile,scalar(@$idxread));
+
+    ##
+    ## Process the prefix & suffix values
+    ##
+
+    if(!defined($prefix))
+      {$prefix = ''}
+
+    if(defined($prefix) && $galaxy)
+      {$prefix =~ s/_/-/g}
+
+    if(defined($suffix) && $galaxy)
+      {$suffix =~ s/_/-/g}
+
+    if(!defined($gzipin))
+      {$gzipin = ($fastq_files->[0] =~ /\.gz/)}
+
+    if(!defined($gzipout))
+      {
+        if(defined($suffix))
+          {$gzipout = ($suffix =~ /\.gz$/)}
+        else
+          {$gzipout = $gzipin}
+      }
+    elsif($gzipout)
+      {
+        if(defined($suffix) && $suffix !~ /\.gz$/)
+          {$suffix .= '.gz'}
+        elsif(!defined($suffix))
+          {$suffix = '.fastq.gz'}
+      }
+
+    if(!defined($suffix))
+      {$suffix = ($gzipout ? '.gz' : '.fastq')}
+
+    ##
+    ## Process the fastq file inputs
+    ##
+
+    #fastq-multx doesn't deal with gzipped input that doesn't have .gz in the
+    #name, so those files must be written to an actual file
+    if($gzipin)
+      {$tmp_files = processGZInfiles($fastq_files,$prefix)}
+
+    if($check_deflines)
+      {
+        $deflinesep = getDeflineSep($fastq_files);
+        if($deflinesep eq '')
+          {
+            if(scalar(@$fastq_files) > 1)
+              {print STDERR ('WARNING: Cannot identify fastq record type.  ',
+                             "Unable to check that deflines match.\n")}
+            $check_deflines = 0;
+          }
+      }
+
+    my $missing_infiles = [grep {!-e $_} @$fastq_files];
+    if(scalar(@$missing_infiles))
+      {
+        print STDERR ('ERROR: ',scalar(@$missing_infiles),' input files do ',
+                      'not exist: ',join(',',@$missing_infiles),"\n");
+        exit(1);
+      }
+
+    ##
+    ## Check the output files
+    ##
+
+    if(!$split_all && scalar(@$fastq_files) == scalar(@$idxread))
+      {$split_all = 1}
+
+    if(outfilesExist($bchash,$fastq_files,$split_all))
+      {exit(7)}
+
+    if(isOutdirMissing($prefix))
+      {
+        print STDERR ("ERROR: Directory in prefix [$prefix] does not exist.\n");
+        exit(1);
+      }
+  }
+
 sub help
   {
     my $short_only = $_[0] || 0;
@@ -142,201 +363,6 @@ configuration arguments:
 END_HELP2
 
     print($msg);
-  }
-
-sub processOptions
-  {
-    my $OptionHash = {
-                      'version:+'       => \$version,
-                      'h|help:+'        => \$help,
-                      'bcfile=s'        => \$bcfile,
-                      'idxread=i{1,2}'  => $idxread,
-                      'mismatches=i'    => \$mismatches,
-                      'barcodes_at_end' => \$barcodes_at_end,
-                      'prefix=s'        => \$prefix,
-                      'suffix=s'        => \$suffix,
-                      'galaxy'          => \$galaxy,
-                      'sanitize!'       => \$sanitize,
-                      'v|verbose:+'     => \$verbose,
-                      'gzipout'         => \$gzipout,
-                      'split_all'       => \$split_all,
-                      'format=s'        => \$format,
-                      'gzipin'          => \$gzipin,
-                      '<>'              => sub {push(@$fastq_files,$_[0])},
-                      'fastq-multx=s'   => \$fastq_multx,
-                      'debug:+'         => \$debug,
-                      'check-deflines'  => \$check_deflines
-                     };
-
-    if(!GetOptions(%$OptionHash))
-      {
-        print STDERR ("Unable to parse command line.\n");
-        exit(1);
-      }
-
-    if($version == 1)
-      {print("$BCSVERSION\n")}
-    elsif($version)
-      {print("barcode_splitter, version $BCSVERSION\n",
-             "htseq2multx, version $VERSION\n",
-             "fastq-multx, version $FQMXVERSION\n")}
-    exit(0) if($version);
-
-    if($help == 1)
-      {help() && exit(0)}
-    elsif($help)
-      {help2() && exit(0)}
-
-    if(scalar(@$fastq_files) == 0)
-      {
-        help(1);
-        print STDERR ("barcode_splitter: error: the following arguments are ",
-                      "required: FILE\n");
-        exit(1);
-      }
-
-    if(scalar(@$idxread) == 0)
-      {
-        help(1);
-        print STDERR ("barcode_splitter: error: Sequence files and at least ",
-                      "one number indicating the indexed file(s) (--idxread) ",
-                      "is required\n");
-        exit(1);
-      }
-
-    if(!defined($bcfile))
-      {
-        help(1);
-        print STDERR ('barcode_splitter: error: Must specify a barcodes file ',
-                      'with "--bcfile" option',"\n");
-        exit(1);
-      }
-    elsif(!-e $bcfile)
-      {
-        #barcode_splitter does not print: help(1);
-        print STDERR ("ERROR: Unable to open barcode file: [Errno 2] No such ",
-                      "file or directory: '$bcfile'\n");
-        exit(1);
-      }
-
-    if(scalar(grep {$_ < 1 || $_ > scalar(@$fastq_files)} @$idxread))
-      {
-        help(1);
-        print STDERR ('barcode_splitter: error: Invalid index read number ',
-                      '("--idxread"), must be between 1 and 1 (the number of ',
-                      "supplied sequence files)\n");
-        exit(1);
-      }
-
-    #Validate the executable (partially for security purposes, since this
-    #wrapper may be initiated via a web tool)
-    my ($multx_version,$is_fqmx,$problem) = getMultxVersion($fastq_multx);
-    my $supported_version                 = [split(/\./,$FQMXVERSION)];
-    if($problem =~ /./)
-      {
-        help2();
-        print('ERROR: There is a problem with the fastq-multx executable: ',
-              "[$problem].  Use the --fastq-multx option described above to ",
-              "supply fastq-multx if it is missing from your PATH.\n");
-        exit(1);
-      }
-    elsif(!$is_fqmx)
-      {
-        help2();
-        print('ERROR: The fastq-multx executable appears to not be fastq-',
-              'multx according to the first 2 lines of its usage.  Use the ',
-              "--fastq-multx option described above to supply fastq-multx.\n");
-        exit(1);
-      }
-    elsif(fqmxVersionInsufficient($multx_version,$supported_version))
-      {
-        help2();
-        if(scalar(@$multx_version) < 1)
-          {print STDERR ('Unable to determine fastq-multx version of ',
-                         "executable [$fastq_multx].  Unable to proceed.\n")}
-        else
-          {print STDERR ('Version [',join('.',@$multx_version),
-                         "] of the fastq-multx executable [$fastq_multx] is ",
-                         "unsupported.  Only version [$FQMXVERSION] or higher ",
-                         'is supported.  Use the --fastq-multx option ',
-                         "described above to supply fastq-multx.\n")}
-        exit(1);
-      }
-
-    if(!defined($prefix))
-      {$prefix = ''}
-
-    if(defined($prefix) && $galaxy)
-      {$prefix =~ s/_/-/g}
-
-    if(defined($suffix) && $galaxy)
-      {$suffix =~ s/_/-/g}
-
-    #Create a hash of the index reads
-    my $order = 1;
-    foreach my $fqf_num (@$idxread)
-      {$index_hash->{$fqf_num - 1} = $order++}
-
-    ($bcfilefqmx,$bchash,$samplehash) =
-      bcs2fqmxBCFile($bcfile,scalar(@$idxread));
-
-    if(!defined($gzipin))
-      {$gzipin = ($fastq_files->[0] =~ /\.gz/)}
-
-    if(!defined($gzipout))
-      {
-        if(defined($suffix))
-          {$gzipout = ($suffix =~ /\.gz$/)}
-        else
-          {$gzipout = $gzipin}
-      }
-    elsif($gzipout)
-      {
-        if(defined($suffix) && $suffix !~ /\.gz$/)
-          {$suffix .= '.gz'}
-        elsif(!defined($suffix))
-          {$suffix = '.fastq.gz'}
-      }
-
-    if(!defined($suffix))
-      {$suffix = ($gzipout ? '.gz' : '.fastq')}
-
-    #fastq-multx doesn't deal with gzipped input that doesn't have .gz in the
-    #name, so those files must be written to an actual file
-    if($gzipin)
-      {$tmp_files = processGZInfiles($fastq_files,$prefix)}
-
-    if($check_deflines)
-      {
-        $deflinesep = getDeflineSep($fastq_files);
-        if($deflinesep eq '')
-          {
-            if(scalar(@$fastq_files) > 1)
-              {print STDERR ('WARNING: Cannot identify fastq record type.  ',
-                             "Unable to check that deflines match.\n")}
-            $check_deflines = 0;
-          }
-      }
-
-    if(!$split_all && scalar(@$fastq_files) == scalar(@$idxread))
-      {$split_all = 1}
-
-    if(outfilesExist($bchash,$fastq_files,$split_all))
-      {exit(7)}
-
-    if(isOutdirMissing($prefix))
-      {
-        print STDERR ("ERROR: Directory in prefix [$prefix] does not exist.\n");
-        exit(1);
-      }
-
-    my $missing_infiles = [grep {!-e $_} @$fastq_files];
-    if(scalar(@$missing_infiles))
-      {
-        print STDERR ('ERROR: ',scalar(@$missing_infiles),' input files do ',
-                      'not exist: ',join(',',@$missing_infiles),"\n");
-        exit(1);
-      }
   }
 
 sub getFastqMultxCommand
