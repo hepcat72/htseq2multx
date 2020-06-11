@@ -187,7 +187,7 @@ sub processOptions
       }
 
     #Initialize the data structures/hashes used, e.g. index_hash, bchash,
-    #samplehash, and read in & convert eh barcode file
+    #samplehash, and read in & convert the barcode file
     my $order = 1;
     foreach my $fqf_num (@$idxread)
       {$index_hash->{$fqf_num - 1} = $order++}
