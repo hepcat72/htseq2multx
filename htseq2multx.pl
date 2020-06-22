@@ -5,10 +5,23 @@ use strict;
 use Getopt::Long qw(:config no_auto_abbrev);
 use IO::Pipe::Producer;
 use IO::Select;
+use English qw(-no_match_vars);
 
-our $VERSION     = '0.1';
-our $BCSVERSION  = '0.18.6';
-our $FQMXVERSION = '1.4';
+our $VERSION     = '0.1';    #Version of this script
+our $BCSVERSION  = '0.18.6'; #Emulated barcode_splitter version
+our $FQMXVERSION = '1.4';    #Minimum required fastq-multx version
+
+#Exit codes (mimmicking barcode_splitter)
+my $SUCCESS         = 0;
+my $GENERIC_ERROR   = 1;
+my $OPEN_BCIN_ERROR = 5;
+my $OPEN_OUT_ERROR  = 6;
+my $OUTFILES_EXIST  = 9;
+my $FQIN_OPEN_ERROR = 10;
+my $DUPE_BC_ROWS    = 12;
+
+#Number of fastq lines at which to give up trying to set the defline separator
+my $FORMAT_DETECT_LINE_MAX = 100;
 
 my $help            = 0;
 my $version         = 0;
@@ -28,7 +41,7 @@ my $fastq_multx     = 'fastq-multx';
 my $debug           = 0;
 my $check_deflines  = 0;
 my $tmp_files       = [];
-my($bcfile,$bcfilefqmx,$stodout,$prefix,$suffix,$format,$gzipin,$deflinesep);
+my($bcfile,$bcfilefqmx,$prefix,$suffix,$format,$gzipin,$deflinesep);
 
 main();
 
@@ -75,7 +88,7 @@ sub processOptions
                       'split_all'       => \$split_all,
                       'format=s'        => \$format,
                       'gzipin'          => \$gzipin,
-                      '<>'              => sub {push(@$fastq_files,$_[0])},
+                      '<>'              => sub {push(@$fastq_files,$ARG[0])},
                       'fastq-multx=s'   => \$fastq_multx,
                       'debug:+'         => \$debug,
                       'check-deflines'  => \$check_deflines
@@ -84,23 +97,34 @@ sub processOptions
     if(!GetOptions(%$OptionHash))
       {
         print STDERR ("Unable to parse command line.\n");
-        exit(1);
+        exit($GENERIC_ERROR);
       }
 
-    #Handle the version option
+    ##
+    ## Handle the version option
+    ##
+
+    #Emulate barcode_splitter
     if($version == 1)
       {print("$BCSVERSION\n")}
+    #Provide all version information
     elsif($version)
-      {print("barcode_splitter, version $BCSVERSION\n",
-             "htseq2multx, version $VERSION\n",
-             "fastq-multx, version $FQMXVERSION\n")}
-    exit(0) if($version);
+      {
+        my($multx_version,$is_fqmx,$problem) = getMultxVersion($fastq_multx);
+        my $multx_used = ($is_fqmx ? join('.',@$multx_version) : 'unknown');
+        print("htseq2multx, version $VERSION\n",
+              "barcode_splitter, emulated version $BCSVERSION\n",
+              "fastq-multx, minimum required version $FQMXVERSION\n",
+              "$fastq_multx, version used $multx_used\n");
+      }
+    if($version)
+      {exit($SUCCESS)}
 
     #Handle the help option
     if($help == 1)
-      {help() && exit(0)}
+      {help() && exit($SUCCESS)}
     elsif($help)
-      {help2() && exit(0)}
+      {help2() && exit($SUCCESS)}
 
     ##
     ## Ensure basically valid values for required options are supplied
@@ -111,7 +135,7 @@ sub processOptions
         help(1);
         print STDERR ("barcode_splitter: error: the following arguments are ",
                       "required: FILE\n");
-        exit(1);
+        exit($GENERIC_ERROR);
       }
 
     if(scalar(@$idxread) == 0)
@@ -120,7 +144,7 @@ sub processOptions
         print STDERR ("barcode_splitter: error: Sequence files and at least ",
                       "one number indicating the indexed file(s) (--idxread) ",
                       "is required\n");
-        exit(1);
+        exit($GENERIC_ERROR);
       }
 
     if(!defined($bcfile))
@@ -128,23 +152,23 @@ sub processOptions
         help(1);
         print STDERR ('barcode_splitter: error: Must specify a barcodes file ',
                       'with "--bcfile" option',"\n");
-        exit(1);
+        exit($GENERIC_ERROR);
       }
     elsif(!-e $bcfile)
       {
         #barcode_splitter does not print: help(1);
         print STDERR ("ERROR: Unable to open barcode file: [Errno 2] No such ",
                       "file or directory: '$bcfile'\n");
-        exit(1);
+        exit($OPEN_BCIN_ERROR);
       }
 
-    if(scalar(grep {$_ < 1 || $_ > scalar(@$fastq_files)} @$idxread))
+    if(scalar(grep {$ARG < 1 || $ARG > scalar(@$fastq_files)} @$idxread))
       {
         help(1);
         print STDERR ('barcode_splitter: error: Invalid index read number ',
                       '("--idxread"), must be between 1 and 1 (the number of ',
                       "supplied sequence files)\n");
-        exit(1);
+        exit($GENERIC_ERROR);
       }
 
     ##
@@ -161,7 +185,7 @@ sub processOptions
         print('ERROR: There is a problem with the fastq-multx executable: ',
               "[$problem].  Use the --fastq-multx option described above to ",
               "supply fastq-multx if it is missing from your PATH.\n");
-        exit(1);
+        exit($GENERIC_ERROR);
       }
     elsif(!$is_fqmx)
       {
@@ -169,7 +193,7 @@ sub processOptions
         print('ERROR: The fastq-multx executable appears to not be fastq-',
               'multx according to the first 2 lines of its usage.  Use the ',
               "--fastq-multx option described above to supply fastq-multx.\n");
-        exit(1);
+        exit($GENERIC_ERROR);
       }
     elsif(fqmxVersionInsufficient($multx_version,$supported_version))
       {
@@ -183,7 +207,7 @@ sub processOptions
                          "unsupported.  Only version [$FQMXVERSION] or higher ",
                          'is supported.  Use the --fastq-multx option ',
                          "described above to supply fastq-multx.\n")}
-        exit(1);
+        exit($GENERIC_ERROR);
       }
 
     #Initialize the data structures/hashes used, e.g. index_hash, bchash,
@@ -249,12 +273,12 @@ sub processOptions
           }
       }
 
-    my $missing_infiles = [grep {!-e $_} @$fastq_files];
+    my $missing_infiles = [grep {!-e $ARG} @$fastq_files];
     if(scalar(@$missing_infiles))
       {
         print STDERR ('ERROR: ',scalar(@$missing_infiles),' input files do ',
                       'not exist: ',join(',',@$missing_infiles),"\n");
-        exit(1);
+        exit($FQIN_OPEN_ERROR);
       }
 
     ##
@@ -265,21 +289,21 @@ sub processOptions
       {$split_all = 1}
 
     if(outfilesExist($bchash,$fastq_files,$split_all))
-      {exit(7)}
+      {exit($OUTFILES_EXIST)}
 
     if(isOutdirMissing($prefix))
       {
         print STDERR ("ERROR: Directory in prefix [$prefix] does not exist.\n");
-        exit(1);
+        exit($GENERIC_ERROR);
       }
   }
 
 sub help
   {
-    my $short_only = $_[0] || 0;
+    my $short_only = $ARG[0] || 0;
 
     my $short_msg  = << 'END_SHORT';
-usage: barcode_splitter [-h] [--version] [--bcfile FILE]
+usage: htseq2multx.pl   [-h] [--version] [--bcfile FILE]
                         [--idxread READNUM [READNUM ...]]
                         [--mismatches MISMATCHES] [--barcodes_at_end]
                         [--prefix PREFIX] [--suffix SUFFIX] [--galaxy]
@@ -293,14 +317,14 @@ END_SHORT
 Split one or more fastq files based on barcode sequence.
 
 optional arguments:
-  -h, --help            show this help message and exit (supply twice for more)
-  --version             show program's version number and exit
+  -h, --help            show this help message and exit*
+  --version             show program's version number and exit*
 
 Barcodes:
   --bcfile FILE         REQUIRED: Tab delimited file: "Sample_ID <tab>
                         Barcode_Sequence" Multiple barcode columns with
                         different barcode lengths allowed, but all barcodes in
-                        each inidividual column must be the same length.
+                        each inidividual column must be the same length.*
   --idxread READNUM [READNUM ...]
                         REQUIRED: Indicate in which read file(s) to search for
                         the corresponding column of barcode sequences, e.g. if
@@ -335,10 +359,13 @@ Input format:
 
 Sequence Inputs:
   FILE                  A series of 1 or more [optionally zipped] fastq files.
+
+* Supply --help twice to see differences between barcode_splitter and this tool.
 END_LONG
 
     print($short_msg);
-    print($long_msg) unless($short_only);
+    unless($short_only)
+      {print($long_msg)}
   }
 
 sub help2
@@ -346,6 +373,13 @@ sub help2
     my $msg = << 'END_HELP2';
 
 The following extra and modified options apply specifically to the htseq2multx.pl wrapper (as opposed to barcode_splitter).
+
+arguments with behavioral differences:
+  --bcfile FILE         barcode_splitter requires all barcodes in a single
+                        column to be the same length, however fastq-multx
+                        supports variable length barcodes, thus the length
+                        consistency check is not performed and no errors about
+                        different barcode lengths are issued.
 
 optional arguments:
   -h, --help            Supply twice to show this message and exit.
@@ -389,12 +423,12 @@ sub getFastqMultxCommand
 #Runs the command and prints stdout/stderr.  Exits as barcode_splitter would.
 sub runFastqMultx
   {
-    my $command = $_[0];
+    my $command = $ARG[0];
 
-    my $producer = new IO::Pipe::Producer();
+    my $producer = IO::Pipe::Producer->new();
     my($stdout_handle,$stderr_handle) = $producer->getSystemProducer($command);
 
-    my $sel = new IO::Select;
+    my $sel = IO::Select->new();
     $sel->add($stdout_handle,$stderr_handle);
     my $stdout = '';
     my $make_error_fatal = 0;
@@ -406,7 +440,9 @@ sub runFastqMultx
             unless(defined($line))
               {
                 $sel->remove($fh);
-                close($fh);
+                unless(close($fh))
+                  {if($CHILD_ERROR && processSTDERR($OS_ERROR))
+                     {$make_error_fatal = 1}}
                 next;
               }
             if($fh == $stdout_handle)
@@ -420,26 +456,28 @@ sub runFastqMultx
           }
       }
 
-    if($? || $make_error_fatal)
+    if($CHILD_ERROR || $make_error_fatal)
       {
         print STDERR ("ERROR: fastq-multx command failed",
-                      ($? ? " with a non-zero exit code [$?]" .
-                       ($! =~ /./ ? " and error: $!" : '.') : ':'),
-                      "\n\t$command\n");
+                      ($CHILD_ERROR ? ' with a non-zero exit code ' .
+                       "[$CHILD_ERROR]" .
+                       ($OS_ERROR =~ /./ ? " and error: $OS_ERROR" : '.') :
+                       ':'),"\n\t$command\n");
         unless($stdout =~ /\t/)
-          {exit(1)}
+          {exit($GENERIC_ERROR)}
       }
 
     print(fqmx2bcsStdout($stdout,scalar(@$idxread)));
   }
 
-#This detects and converts files input via process substitution, and writes them
-#out to temporary files.  Assumes $gzip is true.
+#Since fastq-multx does not handle gzipped input from process substitution, such
+#input is detected here and written to temporary files.  Assumes $gzip is true.
 sub processGZInfiles
   {
-    my $fastq_files = $_[0];
-    my $prefix      = $_[1];
-    return() if(scalar(grep {$_ !~ /\.gz$/i} @$fastq_files) == 0);
+    my $fastq_files = $ARG[0];
+    my $prefix      = $ARG[1];
+    if(scalar(grep {$ARG !~ /\.gz$/i} @$fastq_files) == 0)
+      {return()}
 
     my $tmp_files = [];
 
@@ -452,7 +490,8 @@ sub processGZInfiles
 
     for(my $i = 0;$i <= $#{$fastq_files};$i++)
       {
-        next if($fastq_files->[$i] !~ /\.gz$/i);
+        if($fastq_files->[$i] !~ /\.gz$/i)
+          {next}
         my $file = $template;
         $file =~ s/%/$i/;
         $fastq_files->[$i] = $file;
@@ -465,33 +504,43 @@ sub processGZInfiles
 
 sub writeGZProcSubFile
   {
-    my $inprocsub = $_[0];
-    my $outfile   = $_[1];
+    my $inprocsub = $ARG[0];
+    my $outfile   = $ARG[1];
 
     unless(open(IN,$inprocsub))
       {
         print STDERR ('ERROR: Unable to open input stream from process ',
-                      "substitution [$inprocsub]\n");
-        exit(1);
+                      "substitution [$inprocsub].\n$OS_ERROR\n");
+        exit($FQIN_OPEN_ERROR);
       }
     binmode(IN);
     unless(open(OUT,'>',$outfile))
       {
-        print STDERR ('ERROR: Unable to open temporary output file [$outfile]',
-                      " for process substitution [$inprocsub].\n");
-        exit(1);
+        print STDERR ("ERROR: Unable to open temporary output file [$outfile] ",
+                      "for process substitution [$inprocsub].\n$OS_ERROR\n");
+        exit($OPEN_OUT_ERROR);
       }
     binmode(OUT);
 
     print OUT (<IN>);
 
-    close(OUT);
-    close(IN);
+    unless(close(OUT))
+      {
+        print STDERR ("ERROR: Unable to close temporary output file [$outfile]",
+                      " for process substitution [$inprocsub].\n$OS_ERROR\n");
+        exit($GENERIC_ERROR);
+      }
+    unless(close(IN))
+      {
+        print STDERR ('ERROR: Unable to close input stream from process ',
+                      "substitution [$inprocsub].\n$OS_ERROR\n");
+        exit($FQIN_OPEN_ERROR);
+      }
   }
 
 sub isOutdirMissing
   {
-    my $prefix  = $_[0];
+    my $prefix  = $ARG[0];
     my $missing = 0;
     if($prefix =~ m%(.*/)%)
       {
@@ -504,14 +553,15 @@ sub isOutdirMissing
 
 sub outfilesExist
   {
-    my $hash     = $_[0];
-    my $files    = $_[1];
+    my $hash     = $ARG[0];
+    my $files    = $ARG[1];
     my $existing = 0;
 
     foreach my $fqf_index (0..$#{$files})
       {
         my $template = getOutfileTemplate($fqf_index);
-        next if($template =~ m%n/a%i);
+        if($template =~ m%n/a%i)
+          {next}
         foreach my $sample (keys(%$hash),'unmatched')
           {
             my $outfile = $template;
@@ -534,10 +584,10 @@ sub getMultxVersion
     my $is_fqmx = 1;
 
     my $output  = `($fastq_multx 3>&1 1>&2- 2>&3- ) | head -n 2`;
-    if($?)
+    if($CHILD_ERROR)
       {
-        $error = "fastq-multx failed with a non-zero exit code [$?]" .
-          ($! =~ /./ ? " and error: $!" : '.') . "\n";
+        $error = "fastq-multx failed with a non-zero exit code [$CHILD_ERROR]" .
+          ($OS_ERROR =~ /./ ? " and error: $OS_ERROR" : '.') . "\n";
         return($version,$is_fqmx,$error);
       }
     elsif($output !~ /fastq-multx/)
@@ -555,13 +605,14 @@ sub getMultxVersion
 
 sub fqmxVersionInsufficient
   {
-    my $used = $_[0];
-    my $reqd = $_[1];
+    my $used = $ARG[0];
+    my $reqd = $ARG[1];
 
     my $lim =
       (scalar(@$used) < scalar(@$reqd) ? scalar(@$used) : scalar(@$reqd)) - 1;
 
-    return(1) if($lim == 0);
+    if($lim == 0)
+      {return(1)}
 
     my $insufficient = 0;
     my $num_equal    = 0;
@@ -589,10 +640,22 @@ sub fqmxVersionInsufficient
     return($insufficient);
   }
 
+#Convert a barcode file from barcode_splitter's accepted format to fastq-multx.
+#  It additionally checks the sample names & barcodes and sanitizes the sample
+#  names and it creates 2 hashes: $bchash and $samplehash.  It returns the
+#  converted barcode file and the 2 hashes.  Example:
+#
+#($converted_file,$bchash,$samplehash) =
+#  bcs2fqmxBCFile($barcode_splitter_barcode_file,$number_of_bc_columns)
+#
+#bchash is used to add barcodes to the output stats on STDOUT & looks like this:
+#  bchash->{$sanitized_sample_name} = tab-delimited string of barcodes
+#samplehash maps the sanitized sample name to their unsanitized version, e.g.:
+#  samplehash->{$sanitized_sample_name} = $original_sample_name
 sub bcs2fqmxBCFile
   {
-    my $bcs_file    = $_[0];
-    my $num_indexes = $_[1];
+    my $bcs_file    = $ARG[0];
+    my $num_indexes = $ARG[1];
     my $fqmx_file   = $bcs_file . '.fqmx';
     my $bchash      = {};
     my $samplehash  = {unmatched => 'unmatched'};
@@ -600,18 +663,21 @@ sub bcs2fqmxBCFile
     my $dupes       = 0;
 
     unless(open(BCSBCF,$bcs_file))
-      {print STDERR ("ERROR: Unable to open barcode file: $!") && exit(1)}
+      {print STDERR ("ERROR: Unable to open barcode file: $OS_ERROR") &&
+         exit($OPEN_BCIN_ERROR)}
 
     unless(open(FQMXBCF,'>',$fqmx_file))
-      {print STDERR ("ERROR: Unable to open fqmx barcode file: $!") && exit(1)}
+      {print STDERR ("ERROR: Unable to open fqmx barcode file: $OS_ERROR") &&
+         exit($GENERIC_ERROR)}
 
     my $ln     = 0;
     while(<BCSBCF>)
       {
         $ln++;
         chomp;
-        next if(/^\s*#/ || /^\s*$/);
-        my @cols = split(/\t/,$_);
+        if(/^\s*#/ || /^\s*$/)
+          {next}
+        my @cols = split(/\t/,$ARG);
         if(scalar(@cols) >= ($num_indexes + 1))
           {
             #Keep track of sample names so they can be changed back
@@ -646,7 +712,7 @@ sub bcs2fqmxBCFile
                               "characters or try supplying --nosantize.  ",
                               "Note, UTF8 could cause problems with file ",
                               "names on some systems.\n");
-                exit(1);
+                exit($GENERIC_ERROR);
               }
             $bchash->{$cols[0]} = join("\t",@cols[1..$num_indexes]);
           }
@@ -658,20 +724,24 @@ sub bcs2fqmxBCFile
                          'but found [',scalar(@cols),"].  Skipping.\n")}
       }
 
-    close(FQMXBCF);
-    close(BCSBCF);
+    unless(close(FQMXBCF))
+      {print STDERR ("ERROR: Unable to close fqmx barcode file: $OS_ERROR") &&
+         exit($GENERIC_ERROR)}
+    unless(close(BCSBCF))
+      {print STDERR ("ERROR: Unable to close barcode file: $OS_ERROR") &&
+         exit($OPEN_BCIN_ERROR)}
 
     if($dupes)
       {
         print STDERR ('ERROR: The following barcode IDs have identical index ',
                       "sequences in the barcode file: [$bcs_file]: [",
                       join(';',
-                           map {join(',',@{$uniq_check->{$_}})}
-                           grep {scalar(@{$uniq_check->{$_}}) > 1}
+                           map {join(',',@{$uniq_check->{$ARG}})}
+                           grep {scalar(@{$uniq_check->{$ARG}}) > 1}
                            sort {$uniq_check->{$a}->[0] cmp
                                    $uniq_check->{$b}->[0]} keys(%$uniq_check)),
                       "].\n");
-        exit(12);
+        exit($DUPE_BC_ROWS);
       }
 
     return($fqmx_file,$bchash,$samplehash);
@@ -679,7 +749,7 @@ sub bcs2fqmxBCFile
 
 sub getOutfileTemplate
   {
-    my $fqf_index = $_[0];
+    my $fqf_index = $ARG[0];
     my $read_num  = $fqf_index + 1;
     my $template  = '';
 
@@ -699,7 +769,7 @@ sub getOutfileTemplate
 
 sub getGlobPattern
   {
-    my $sample       = $_[0];
+    my $sample       = $ARG[0];
     my $glob_pattern = '';
     if(defined($prefix))
       {$glob_pattern .= $prefix}
@@ -711,8 +781,8 @@ sub getGlobPattern
 
 sub getDeflineSep
   {
-    my $fastq_files = $_[0];
-    my $gzipin      = $_[1];
+    my $fastq_files = $ARG[0];
+    my $gzipin      = $ARG[1];
     my $sep         = '';
 
     my $ilpat    = '[a-zA-Z0-9_:-]+ [0-9:YNATGC]+';
@@ -721,8 +791,12 @@ sub getDeflineSep
     if($gzipin)
       {
         use IO::Uncompress::Gunzip;
-        my $z = new IO::Uncompress::Gunzip $fastq_files->[0] ||
-          die("gunzip failed\n");
+        my $z = IO::Uncompress::Gunzip->new($fastq_files->[0]);
+        unless($z)
+          {
+            print STDERR ("gunzip open failed.\n");
+            exit($GENERIC_ERROR);
+          }
         my $l = 0;
         while($z->getline())
           {
@@ -736,14 +810,22 @@ sub getDeflineSep
                 last;
               }
             #Just in case...
-            last if($l > 100);
+            if($l > $FORMAT_DETECT_LINE_MAX)
+              {last}
           }
-        $z->close();
+        unless($z->close())
+          {
+            print STDERR ("gunzip close failed.\n");
+            exit($GENERIC_ERROR);
+          }
       }
     else
       {
         unless(open(FQ,$fastq_files->[0]))
-          {die("open failed\n")}
+          {
+            print STDERR ("open of $fastq_files->[0] failed\n");
+            exit($FQIN_OPEN_ERROR);
+          }
         my $l = 0;
         while(<FQ>)
           {
@@ -757,7 +839,13 @@ sub getDeflineSep
                 last;
               }
             #Just in case...
-            last if($l > 100);
+            if($l > $FORMAT_DETECT_LINE_MAX)
+              {last}
+          }
+        unless(close(FQ))
+          {
+            print STDERR ("close of $fastq_files->[0] failed.\n");
+            exit($GENERIC_ERROR);
           }
       }
 
@@ -766,14 +854,15 @@ sub getDeflineSep
 
 sub fqmx2bcsStdout
   {
-    my $stdout      = $_[0];
-    my $num_indexes = $_[1];
+    my $stdout      = $ARG[0];
+    my $num_indexes = $ARG[1];
     my $bcs_stdout  = '';
 
-    return() unless(defined($stdout));
+    unless(defined($stdout))
+      {return()}
 
     #header
-    $bcs_stdout .= join("\t",('Sample',(map {"Barcode$_"} (1..$num_indexes)),
+    $bcs_stdout .= join("\t",('Sample',(map {"Barcode$ARG"} (1..$num_indexes)),
                               'Count','Percent','Files')) . "\n";
 
     my $summary_array = [];
@@ -783,32 +872,33 @@ sub fqmx2bcsStdout
     foreach(split(/\n/,$stdout))
       {
         #Skip header, empty, & commented lines
-        next if(/Id\tCount\t/ || /^\s*$/ || /^\s*#/ || /^total\t\d+$/);
+        if(/Id\tCount\t/ || /^\s*$/ || /^\s*#/ || /^total\t\d+$/)
+          {next}
 
         $output_exists = 1;
 
         chomp;
-        my @d = split(/\t/,$_);
+        my @d = split(/\t/,$ARG);
 
         if(scalar(@d) < 3)
           {
             print STDERR ('ERROR: Unable to parse fastq-multx standard ',
                           "output.\n");
-            $bcs_stdout .= "#$_\n";
+            $bcs_stdout .= "#$ARG\n";
             next;
           }
 
         if($d[0] ne 'unmatched' && !exists($bchash->{$d[0]}))
           {
             print STDERR ("ERROR: Unknown sample name: [$d[0]].\n");
-            $bcs_stdout .= "#$_\n";
+            $bcs_stdout .= "#$ARG\n";
             next;
           }
 
         if($d[1] =~ /\D/)
           {
             print STDERR ("ERROR: Invalid count value: [$d[1]].\n");
-            $bcs_stdout .= "#$_\n";
+            $bcs_stdout .= "#$ARG\n";
             next;
           }
 
@@ -833,7 +923,7 @@ sub fqmx2bcsStdout
 
 sub processSTDERR
   {
-    my $line = $_[0];
+    my $line = $ARG[0];
 
     #Echo errors out to STDERR
     my $filter_pats = ['^Using Barcode File: ','End used: '];
@@ -856,8 +946,8 @@ sub processSTDERR
 
 sub indexesFirst
   {
-    my $a = $_[0];
-    my $b = $_[1];
+    my $a = $ARG[0];
+    my $b = $ARG[1];
 
     #Determine ith both files are index reads
     my $both_r_indexes = (exists($index_hash->{$a}) &&
@@ -877,8 +967,9 @@ END
     if(!$debug)
       {
         my $del_files = [$bcfilefqmx];
-        push(@$del_files,@$tmp_files) if(defined($tmp_files));
-        foreach(grep {defined($_) && -e $_} @$del_files)
-          {unlink($_)}
+        if(defined($tmp_files))
+          {push(@$del_files,@$tmp_files)}
+        foreach(grep {defined($ARG) && -e $ARG} @$del_files)
+          {unlink($ARG)}
       }
   }

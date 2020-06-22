@@ -211,7 +211,7 @@ OUTPUTS="summary.out error.out"
 NOT_OUTPUTS=""
 $BARCODE_SPLITTER --mismatches 2 --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" "baddir/barcode_splitter1.fastq" --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
 EXIT_CODE=$?
-EXPECTED_EXIT_CODE=1
+EXPECTED_EXIT_CODE=10
 check_test_results
 
 
@@ -222,7 +222,7 @@ OUTPUTS="summary.out error.out"
 NOT_OUTPUTS=""
 $BARCODE_SPLITTER --mismatches 2 --bcfile "baddir/barcode_splitter_barcodes.txt" "${TEST_DATA}/barcode_splitter1.fastq" --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
 EXIT_CODE=$?
-EXPECTED_EXIT_CODE=1
+EXPECTED_EXIT_CODE=5
 check_test_results
 
 
@@ -234,7 +234,7 @@ NOT_OUTPUTS=""
 touch ${TEST_OUTPUT}/${TEST}_unmatched-read-1.out
 $BARCODE_SPLITTER --mismatches 2 --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" "${TEST_DATA}/barcode_splitter1.fastq" --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
 EXIT_CODE=$?
-EXPECTED_EXIT_CODE=7
+EXPECTED_EXIT_CODE=9
 check_test_results
 
 
@@ -246,7 +246,7 @@ NOT_OUTPUTS=""
 touch ${TEST_OUTPUT}/${TEST}_BC1-read-1.out
 $BARCODE_SPLITTER --mismatches 2 --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" "${TEST_DATA}/barcode_splitter1.fastq" --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
 EXIT_CODE=$?
-EXPECTED_EXIT_CODE=7
+EXPECTED_EXIT_CODE=9
 check_test_results
 
 
@@ -269,7 +269,7 @@ OUTPUTS="summary.out error.out"
 NOT_OUTPUTS=""
 $BARCODE_SPLITTER --mismatches 2 --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" "baddir/barcode_splitter1.fastq.gz" --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
 EXIT_CODE=$?
-EXPECTED_EXIT_CODE=1
+EXPECTED_EXIT_CODE=10
 check_test_results
 
 
@@ -281,7 +281,7 @@ NOT_OUTPUTS=""
 touch ${TEST_OUTPUT}/${TEST}_unmatched-read-1.out.gz
 $BARCODE_SPLITTER --mismatches 2 --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" "${TEST_DATA}/barcode_splitter1.fastq" --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all --gzipout $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
 EXIT_CODE=$?
-EXPECTED_EXIT_CODE=7
+EXPECTED_EXIT_CODE=9
 check_test_results
 
 
@@ -293,7 +293,7 @@ NOT_OUTPUTS=""
 touch ${TEST_OUTPUT}/${TEST}_BC1-read-1.out.gz
 $BARCODE_SPLITTER --mismatches 2 --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" "${TEST_DATA}/barcode_splitter1.fastq" --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all --gzipout $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
 EXIT_CODE=$?
-EXPECTED_EXIT_CODE=7
+EXPECTED_EXIT_CODE=9
 check_test_results
 
 
