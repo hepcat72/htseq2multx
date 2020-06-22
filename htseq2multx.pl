@@ -584,7 +584,7 @@ sub getMultxVersion
     my $error   = '';
     my $is_fqmx = 1;
 
-    my $output  = `($fastq_multx 3>&1 1>&2- 2>&3- ) | head -n 2`;
+    my $output  = `($fastq_multx 2>&1 ) | head -n 2`;
     if($CHILD_ERROR)
       {
         $error = "fastq-multx failed with a non-zero exit code [$CHILD_ERROR]" .
