@@ -2,3 +2,6 @@ tests/test_output/*
 tests/.DS_Store
 tests/test_data/*.fqmx
 *~
+MYMETA*
+Makefile
+*blib

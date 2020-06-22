@@ -6,22 +6,23 @@ use Getopt::Long qw(:config no_auto_abbrev);
 use IO::Pipe::Producer;
 use IO::Select;
 use English qw(-no_match_vars);
+use Readonly;
 
 our $VERSION     = '0.1';    #Version of this script
 our $BCSVERSION  = '0.18.6'; #Emulated barcode_splitter version
 our $FQMXVERSION = '1.4';    #Minimum required fastq-multx version
 
 #Exit codes (mimmicking barcode_splitter)
-my $SUCCESS         = 0;
-my $GENERIC_ERROR   = 1;
-my $OPEN_BCIN_ERROR = 5;
-my $OPEN_OUT_ERROR  = 6;
-my $OUTFILES_EXIST  = 9;
-my $FQIN_OPEN_ERROR = 10;
-my $DUPE_BC_ROWS    = 12;
+Readonly::Scalar my $SUCCESS         => 0;
+Readonly::Scalar my $GENERIC_ERROR   => 1;
+Readonly::Scalar my $OPEN_BCIN_ERROR => 5;
+Readonly::Scalar my $OPEN_OUT_ERROR  => 6;
+Readonly::Scalar my $OUTFILES_EXIST  => 9;
+Readonly::Scalar my $FQIN_OPEN_ERROR => 10;
+Readonly::Scalar my $DUPE_BC_ROWS    => 12;
 
 #Number of fastq lines at which to give up trying to set the defline separator
-my $FORMAT_DETECT_LINE_MAX = 100;
+Readonly::Scalar my $FORMAT_DETECT_LINE_MAX => 100;
 
 my $help            = 0;
 my $version         = 0;
