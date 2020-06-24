@@ -1,5 +1,7 @@
 #Makefile.PL version 1.0
 
+use strict;
+use warnings;
 use 5.010001;
 use ExtUtils::MakeMaker;
 
