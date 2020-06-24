@@ -22,7 +22,7 @@ WriteMakefile
    VERSION_FROM    => "$scripts[0]", # finds $VERSION
    PREREQ_PM       => {'IO::Pipe::Producer'     => 2.01,
                        'IO::Select'             => 1.21,
-                       'IO::Uncompress::Gunzip' => 2.060,
+                       'IO::Uncompress::Gunzip' => '2.060',
                        'Getopt::Long'           => 2.38,
                        'File::Glob'             => 1.17,
                        'strict'                 => 1.07,
