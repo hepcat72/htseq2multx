@@ -491,13 +491,13 @@ sub processGZInfiles
 
     for(my $i = 0;$i <= $#{$fastq_files};$i++)
       {
-        if($fastq_files->[$i] !~ /\.gz$/i)
+        if($fastq_files->[$i] =~ /\.gz$/i)
           {next}
         my $file = $template;
         $file =~ s/%/$i/;
-        $fastq_files->[$i] = $file;
         push(@$tmp_files,$file);
         writeGZProcSubFile($fastq_files->[$i],$file);
+        $fastq_files->[$i] = $file;
       }
 
     return(wantarray ? @$tmp_files : $tmp_files);
@@ -508,30 +508,41 @@ sub writeGZProcSubFile
     my $inprocsub = $ARG[0];
     my $outfile   = $ARG[1];
 
-    unless(open(IN,$inprocsub))
+    if(!open(IN,'<',$inprocsub))
       {
         print STDERR ('ERROR: Unable to open input stream from process ',
                       "substitution [$inprocsub].\n$OS_ERROR\n");
         exit($FQIN_OPEN_ERROR);
       }
-    binmode(IN);
-    unless(open(OUT,'>',$outfile))
+    if(!defined(binmode(IN)))
+      {
+        print STDERR ('ERROR: Unable to put input stream from process ',
+                      "substitution [$inprocsub] in binary mode.\n$OS_ERROR\n");
+        exit($FQIN_OPEN_ERROR);
+      }
+    if(!open(OUT,'>',$outfile))
       {
         print STDERR ("ERROR: Unable to open temporary output file [$outfile] ",
                       "for process substitution [$inprocsub].\n$OS_ERROR\n");
         exit($OPEN_OUT_ERROR);
       }
-    binmode(OUT);
+    if(!defined(binmode(OUT)))
+      {
+        print STDERR ("ERROR: Unable to put temporary output file [$outfile] ",
+                      "for process substitution [$inprocsub] in binary mode.\n",
+                      "$OS_ERROR\n");
+        exit($OPEN_OUT_ERROR);
+      }
 
     print OUT (<IN>);
 
-    unless(close(OUT))
+    if(!close(OUT))
       {
         print STDERR ("ERROR: Unable to close temporary output file [$outfile]",
                       " for process substitution [$inprocsub].\n$OS_ERROR\n");
         exit($GENERIC_ERROR);
       }
-    unless(close(IN))
+    if(!close(IN))
       {
         print STDERR ('ERROR: Unable to close input stream from process ',
                       "substitution [$inprocsub].\n$OS_ERROR\n");

@@ -338,8 +338,7 @@ TEST=test_25
 rm -f ${TEST_OUTPUT}/${TEST}_* 2> /dev/null
 OUTPUTS="BC1-read-1.out.gz BC2-read-1.out.gz BC3-read-1.out.gz BC4-read-1.out.gz unmatched-read-1.out.gz summary.out error.out"
 NOT_OUTPUTS=""
-CAT="gunzip -c"
-$BARCODE_SPLITTER --mismatches 2 --gzipin --gzipout --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" <($CAT "${TEST_DATA}/barcode_splitter1.fastq.gz") --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
+$BARCODE_SPLITTER --mismatches 2 --gzipin --gzipout --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" <(cat "${TEST_DATA}/barcode_splitter1.fastq.gz") --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
 EXIT_CODE=$?
 EXPECTED_EXIT_CODE=0
 check_test_results

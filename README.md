@@ -25,23 +25,46 @@ This repo contains the details necessary to install the htseq2multx's module dep
 ### Local/user-account install
 
     git clone https://github.com/hepcat72/split-seq-processing.git
-    cd split-seq-processing
+    cd htseq2multx
     perl Makefile.PL INSTALL_BASE=~
     make
     make install
 
 Where `~` in the perl command causes the module to go into ~/lib.  Replace `~` with wherever you wish to install.
 
-### Caveats:
+### Dependencies:
 
-Module dependencies should install automatically, but if any do not and `perl Makefile.PL` issues a warning such as:
+If the `perl Makefile.PL` step above reports any missing or insufficient versions of modules, with:
 
     Warning: prerequisite Readonly 2.05 not found.
 
-you can try, for example:
+that's OK.  You can install the dependencies after the install above.  Here are a couple ways to do that:
+
+#### With cpan
+
+Anyone (with perl) can run cpan, so we'll start with the cpan method for installing dependencies.  Run cpan in passive FTP mode (required for some systems).  You may be prompted to configure cpan.  Usually, going with all the defaults is sufficient.
 
     FTP_PASSIVE=1 PERL_MM_USE_DEFAULT=1 perl -MCPAN -e shell
-    cpan> install Readonly
+
+Then the install of each module can be done from the cpan prompt like this example (following the example warning above):
+
+    install Readonly
+
+#### With cpan-minus
+
+If you don't have cpan minus, here is how to install it:
+
+##### System-wide install
+
+    curl -L https://cpanmin.us | perl - --sudo App::cpanminus
+
+##### Local/user-account install
+
+    curl -L https://cpanmin.us | perl - App::cpanminus
+
+Then, all dependencies can be installed from the htseq2multx directory with:
+
+    cpanm --installdeps --notest .
 
 ### Optional
 

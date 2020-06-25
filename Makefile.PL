@@ -27,7 +27,7 @@ WriteMakefile
                        'File::Glob'             => 1.17,
                        'strict'                 => 1.07,
                        'warnings'               => 1.13,
-                       'English'                => '1.06_01',
+                       'English'                => 1.05,
                        'Readonly'               => 2.05},
    EXE_FILES       => [@scripts]
   );
@@ -55,26 +55,26 @@ sub getExe
 
     if(eval("use File::Which;1;"))
       {
-	$exe = which($sent_exe);
-	if((!defined($exe) || $exe eq '') && -e $sent_exe && -x $sent_exe)
-	  {$exe = $sent_exe}
-	elsif(!defined($exe))
-	  {$exe = ''}
+        $exe = which($sent_exe);
+        if((!defined($exe) || $exe eq '') && -e $sent_exe && -x $sent_exe)
+          {$exe = $sent_exe}
+        elsif(!defined($exe))
+          {$exe = ''}
       }
     else
       {
-	print STDERR ("File::Which not found, switching to backup method.\n");
-	$exe = `which $sent_exe`;
-	chomp($exe);
-	if($exe =~ /which: Command not found./ || $exe !~ /\S/)
-	  {
-	    print STDERR ("ERROR: System command 'which' does not appear to ",
+        print STDERR ("File::Which not found, switching to backup method.\n");
+        $exe = `which $sent_exe`;
+        chomp($exe);
+        if($exe =~ /which: Command not found./)
+          {
+            print STDERR ("ERROR: System command 'which' does not appear to ",
                           'exist.  Please install the perl module File::Which.',
                           "\n");
-	    $exe = '';
-	  }
-	elsif($exe =~ /not found/i)
-	  {$exe = ''}
+            $exe = '';
+          }
+        else
+          {$exe = ''}
       }
 
     return($exe);

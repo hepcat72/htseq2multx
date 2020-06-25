@@ -5,3 +5,4 @@ tests/test_data/*.fqmx
 MYMETA*
 Makefile
 *blib
+.DS_Store
