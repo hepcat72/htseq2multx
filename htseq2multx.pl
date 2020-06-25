@@ -402,6 +402,11 @@ END_HELP2
 
 sub getFastqMultxCommand
   {
+    # -x          Don't trim barcodes off before writing out destination
+    # -d N        Require a minimum distance of N between the best and next best (2)
+    # -B BCFIL    Use barcodes from BCFIL, no determination step, codes in <read1.fq>
+    # -m N        Allow N mismatches in union of all indexes, unless -M is supplied. (1)
+    # -M M        Allow N,M mismatches in indexes 1,2 respectively (see -m N) (not used)
     my $command =
       "$fastq_multx -x -d 1 -B '$bcfilefqmx' -m $mismatches -M $mismatches";
 
