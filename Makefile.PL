@@ -14,7 +14,7 @@ WriteMakefile
    NAME            => 'htseq2multx',
 
    #Add these new keywords supported since 5.005
-   ($[ >= 5.005 ?
+   ($] >= 5.005 ?
 
     (AUTHOR        => 'Robert W. Leach (rleach@princeton.edu)',
      ABSTRACT_FROM => "$scripts[0]") : ()),
