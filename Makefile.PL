@@ -16,20 +16,23 @@ WriteMakefile
    #Add these new keywords supported since 5.005
    ($] >= 5.005 ?
 
-    (AUTHOR        => 'Robert W. Leach (rleach@princeton.edu)',
-     ABSTRACT_FROM => "$scripts[0]") : ()),
+    (AUTHOR     => 'Robert W. Leach (rleach@princeton.edu)',
+     ABSTRACT   => join('',
+			('htseq2multx - Wrapper to fastq-multx to have it ',
+			 'mimmic barcode_splitter and thus easily integrate ',
+			 'with Princeton\'s HTSEQ web interface.'))) : ()),
 
-   VERSION_FROM    => "$scripts[0]", # finds $VERSION
-   PREREQ_PM       => {'IO::Pipe::Producer'     => 2.01,
-                       'IO::Select'             => 1.21,
-                       'IO::Uncompress::Gunzip' => '2.060',
-                       'Getopt::Long'           => 2.38,
-                       'File::Glob'             => 1.17,
-                       'strict'                 => 1.07,
-                       'warnings'               => 1.13,
-                       'English'                => 1.05,
-                       'Readonly'               => 2.05},
-   EXE_FILES       => [@scripts]
+   VERSION_FROM => "$scripts[0]",
+   PREREQ_PM    => {'IO::Pipe::Producer'     => 2.01,
+                    'IO::Select'             => 1.21,
+                    'IO::Uncompress::Gunzip' => '2.060',
+                    'Getopt::Long'           => 2.38,
+                    'File::Glob'             => 1.17,
+                    'strict'                 => 1.07,
+                    'warnings'               => 1.13,
+                    'English'                => 1.05,
+                    'Readonly'               => 2.05},
+   EXE_FILES    => [@scripts]
   );
 
 my $fastq_multx = getExe($fqmx_name);
@@ -56,6 +59,9 @@ sub getExe
     if(eval("use File::Which;1;"))
       {
         $exe = which($sent_exe);
+        #which from the module (at least in some versions) empties out valid
+        #executables provided with absolute paths if that path is not in PATH,
+        #in which case, this recovery is necessary
         if((!defined($exe) || $exe eq '') && -e $sent_exe && -x $sent_exe)
           {$exe = $sent_exe}
         elsif(!defined($exe))
@@ -73,8 +79,6 @@ sub getExe
                           "\n");
             $exe = '';
           }
-        else
-          {$exe = ''}
       }
 
     return($exe);
