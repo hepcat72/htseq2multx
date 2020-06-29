@@ -1,5 +1,5 @@
 name: Setup Perl environment
-# This workflow is triggered on pushes to the repository.
+
 on: [push]
 
 uses: shogo82148/actions-setup-perl@v1.6.0
@@ -13,7 +13,7 @@ jobs:
     - uses: shogo82148/actions-setup-perl@v1
       with:
         perl-version: '5.18'
-    - run: cpanm --installdeps --notest .
     - run: |
-      cd tests
-      bash run_tests.sh
+        cpanm --installdeps --notest .
+        cd tests
+        ./run_tests.sh
