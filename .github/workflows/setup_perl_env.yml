@@ -13,7 +13,7 @@ jobs:
     - run: |
         cd fastq-multx
         make
-        echo "::add-path::./fastq-multx"
+        echo "::add-path::../fastq-multx"
         cd ..
     - uses: actions/checkout@v2
     - name: Setup perl & install htseq2multx
