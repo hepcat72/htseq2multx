@@ -16,4 +16,4 @@ jobs:
     - run: cpanm --installdeps --notest .
     - run: |
       cd tests
-      ./run_tests.sh
+      bash run_tests.sh
