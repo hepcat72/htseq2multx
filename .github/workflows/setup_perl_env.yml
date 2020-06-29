@@ -11,8 +11,10 @@ jobs:
         path: fastq-multx
         ref: 'v1.4.0'
     - run: |
+        cd fastq-multx
         make
         echo "::add-path::./fastq-multx"
+        cd ..
     - name: Setup perl & install htseq2multx
       uses: shogo82148/actions-setup-perl@v1
       with:
