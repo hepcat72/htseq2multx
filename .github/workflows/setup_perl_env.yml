@@ -1,13 +1,10 @@
 name: Setup Perl environment
-
 on: [push]
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-
-    - name: Checkout fastq-multx
+    - name: htseq2multx & fastq-multx build & test
     - uses: actions/checkout@v2
       with:
         repository: 'brwnj/fastq-multx'
@@ -18,8 +15,6 @@ jobs:
         make
         echo "::add-path::./fastq-multx"
         cd ..
-
-    - name: htseq2multx build & test
     - uses: actions/checkout@v2
     - uses: shogo82148/actions-setup-perl@v1
       with:
