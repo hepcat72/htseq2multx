@@ -15,8 +15,8 @@ jobs:
         make
         cd ..
         mkdir -p $GITHUB_WORKSPACE/bin
-        echo "::add-path::$GITHUB_WORKSPACE/bin"
         cp fastq-multx/fastq-multx $GITHUB_WORKSPACE/bin
+        echo "::add-path::$GITHUB_WORKSPACE/bin"
         chmod +x $GITHUB_WORKSPACE/bin/fastq-multx
     - uses: actions/checkout@v2
     - name: Setup perl & install htseq2multx
