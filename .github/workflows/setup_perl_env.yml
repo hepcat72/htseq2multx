@@ -11,13 +11,13 @@ jobs:
         path: fastq-multx
         ref: 'v1.4.0'
     - run: |
+        mkdir -p $GITHUB_WORKSPACE/bin
         cd fastq-multx
         make
-        cd ..
-        mkdir -p $GITHUB_WORKSPACE/bin
-        cp fastq-multx/fastq-multx $GITHUB_WORKSPACE/bin
+        cp fastq-multx $GITHUB_WORKSPACE/bin
         echo "::add-path::$GITHUB_WORKSPACE/bin"
         chmod +x $GITHUB_WORKSPACE/bin/fastq-multx
+        cd ..
     - uses: actions/checkout@v2
     - name: Setup perl & install htseq2multx
       uses: shogo82148/actions-setup-perl@v1
