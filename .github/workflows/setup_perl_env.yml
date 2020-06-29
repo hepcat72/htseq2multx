@@ -10,7 +10,7 @@ jobs:
         repository: 'brwnj/fastq-multx'
         path: fastq-multx
         ref: 'v1.4.0'
-      run: |
+    - run: |
         make
         echo "::add-path::./fastq-multx"
     - name: Setup perl & install htseq2multx
@@ -18,7 +18,7 @@ jobs:
       uses: shogo82148/actions-setup-perl@v1
       with:
         perl-version: '5.18'
-      run: |
+    - run: |
         cpanm --installdeps --notest .
         cd tests
         ./run_tests.sh
