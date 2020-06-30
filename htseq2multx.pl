@@ -446,9 +446,9 @@ sub runFastqMultx
             unless(defined($line))
               {
                 $sel->remove($fh);
-                unless(close($fh))
-                  {if($CHILD_ERROR && processSTDERR($OS_ERROR))
-                     {$make_error_fatal = 1}}
+#                unless(close($fh))
+#                  {if($CHILD_ERROR && processSTDERR($OS_ERROR))
+#                     {$make_error_fatal = 1}}
                 next;
               }
             if($fh == $stdout_handle)
