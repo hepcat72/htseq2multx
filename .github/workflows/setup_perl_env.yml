@@ -10,7 +10,7 @@ jobs:
         repository: 'brwnj/fastq-multx'
         path: fastq-multx
         ref: 'v1.4.0'
-    - name: build and install fastq-multx
+    - name: Install fastq-multx
       run: |
         cd fastq-multx
         make
@@ -24,18 +24,17 @@ jobs:
       uses: actions/checkout@v2
       with:
           path: htseq2multx
-          clean: false
-    - name: install htseq2multx dependencies
+    - name: Install htseq2multx dependencies
       run: |
         cd htseq2multx
         cpanm --installdeps --notest .
-    - name: build and install htseq2multx
+    - name: Install htseq2multx
       run: |
         cd htseq2multx
         perl Makefile.PL
         make
         make install
-    - name: run htseq2multx tests
+    - name: Tes htseq2multx
       run: |
         cd htseq2multx/tests
         ./run_tests.sh
