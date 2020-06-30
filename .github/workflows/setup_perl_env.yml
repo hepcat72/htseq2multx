@@ -4,26 +4,38 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Setup fastq-multx
+    - name: Checkout fastq-multx
       uses: actions/checkout@v2
       with:
         repository: 'brwnj/fastq-multx'
         path: fastq-multx
         ref: 'v1.4.0'
-    - run: |
-        mkdir -p $GITHUB_WORKSPACE/bin
+    - name: build and install fastq-multx
+      run: |
         cd fastq-multx
         make
-        cp fastq-multx $GITHUB_WORKSPACE/bin
-        echo "::add-path::$GITHUB_WORKSPACE/bin"
-        chmod +x $GITHUB_WORKSPACE/bin/fastq-multx
-        cd ..
-    - uses: actions/checkout@v2
-    - name: Setup perl & install htseq2multx
+        chmod +x fastq-multx
+        echo "::add-path::${GITHUB_WORKSPACE}/fastq-multx"
+    - name: Setup perl
       uses: shogo82148/actions-setup-perl@v1
       with:
         perl-version: '5.18'
-    - run: |
+    - name: Checkout htseq2multx
+      uses: actions/checkout@v2
+      with:
+          path: htseq2multx
+          clean: false
+    - name: install htseq2multx dependencies
+      run: |
+        cd htseq2multx
         cpanm --installdeps --notest .
-        cd tests
+    - name: build and install htseq2multx
+      run: |
+        cd htseq2multx
+        perl Makefile.PL
+        make
+        make install
+    - name: run htseq2multx tests
+      run: |
+        cd htseq2multx/tests
         ./run_tests.sh
