@@ -943,7 +943,9 @@ sub processSTDERR
     my $line = $ARG[0];
 
     #Echo errors out to STDERR
-    my $filter_pats = ['^Using Barcode File: ','End used: ','gzip: stdout: Broken pipe','^\s*$'];
+    my $filter_pats = ['^Using Barcode File: ','End used: '
+                       #,'gzip: stdout: Broken pipe','^\s*$'
+                      ];
     my $filter_pat  = join('|',@$filter_pats);
 
     #Exit non-zero when fatal error is encountered (because fastq-multx doesn't)
@@ -981,6 +983,7 @@ sub indexesFirst
 
 END
   {
+    my $exit_status = $?;
     if(!$debug)
       {
         my $del_files = [$bcfilefqmx];
@@ -989,4 +992,10 @@ END
         foreach(grep {defined($ARG) && -e $ARG} @$del_files)
           {unlink($ARG)}
       }
+    #Just in case fastq-multx is cleaning up from the system call.  Otherwise,
+    #some systems cause gzip to complain about a broken stdout pipe from inside
+    #fastq-multx
+    wait();
+    #Now reset the exit status, which wait may have changed
+    $? = $exit_status;
   }
