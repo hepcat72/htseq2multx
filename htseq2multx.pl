@@ -446,9 +446,9 @@ sub runFastqMultx
             unless(defined($line))
               {
                 $sel->remove($fh);
-#                unless(close($fh))
-#                  {if($CHILD_ERROR && processSTDERR($OS_ERROR))
-#                     {$make_error_fatal = 1}}
+                unless(close($fh))
+                  {if($CHILD_ERROR && processSTDERR($OS_ERROR))
+                     {$make_error_fatal = 1}}
                 next;
               }
             if($fh == $stdout_handle)
@@ -943,7 +943,7 @@ sub processSTDERR
     my $line = $ARG[0];
 
     #Echo errors out to STDERR
-    my $filter_pats = ['^Using Barcode File: ','End used: '];
+    my $filter_pats = ['^Using Barcode File: ','End used: ','gzip: stdout: Broken pipe'];
     my $filter_pat  = join('|',@$filter_pats);
 
     #Exit non-zero when fatal error is encountered (because fastq-multx doesn't)
