@@ -431,10 +431,6 @@ sub runFastqMultx
   {
     my $command = $ARG[0];
 
-    #Set the buffer flush for the inherited handles
-    STDOUT->autoflush(1);
-    STDERR->autoflush(1);
-
     my $producer = IO::Pipe::Producer->new();
     my($stdout_handle,$stderr_handle) = $producer->getSystemProducer($command);
 
@@ -944,12 +940,10 @@ sub processSTDERR
     my $line = $ARG[0];
 
     #Echo errors out to STDERR
-    my $filter_pats = ['^Using Barcode File: ','End used: '
-                       #The following works around an issue with fastq-multx's
-                       #system call to gzip complaining about a broken stdout
-                       #pipe
-                       #,'gzip: stdout: Broken pipe','^\s*$'
-                      ];
+    my $filter_pats = ['^Using Barcode File: ','End used: ',
+                       #These two work around an apparently innocuous gzip issue
+                       #in fastq-multx
+                       'gzip: stdout: Broken pipe','^\s*$'];
     my $filter_pat  = join('|',@$filter_pats);
 
     #Exit non-zero when fatal error is encountered (because fastq-multx doesn't)
@@ -987,7 +981,6 @@ sub indexesFirst
 
 END
   {
-    my $exit_status = $?;
     if(!$debug)
       {
         my $del_files = [$bcfilefqmx];
@@ -996,10 +989,4 @@ END
         foreach(grep {defined($ARG) && -e $ARG} @$del_files)
           {unlink($ARG)}
       }
-    #Just in case fastq-multx is cleaning up from the system call.  Otherwise,
-    #some systems cause gzip to complain about a broken stdout pipe from inside
-    #fastq-multx
-    wait();
-    #Now reset the exit status, which wait may have changed
-    $? = $exit_status;
   }
