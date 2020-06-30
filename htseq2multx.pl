@@ -431,6 +431,10 @@ sub runFastqMultx
   {
     my $command = $ARG[0];
 
+    #Set the buffer flush for the inherited handles
+    STDOUT->autoflush(1);
+    STDERR->autoflush(1);
+
     my $producer = IO::Pipe::Producer->new();
     my($stdout_handle,$stderr_handle) = $producer->getSystemProducer($command);
 
