@@ -343,4 +343,16 @@ EXIT_CODE=$?
 EXPECTED_EXIT_CODE=0
 check_test_results
 
+
+# Test the fastq-multx executable itself and its handling of gzip data
+TEST=test_26
+rm -f ${TEST_OUTPUT}/${TEST}_* 2> /dev/null
+OUTPUTS="BC1-read-1.out.gz BC2-read-1.out.gz BC3-read-1.out.gz BC4-read-1.out.gz unmatched-read-1.out.gz summary.out error.out"
+NOT_OUTPUTS=""
+fastq-multx -x -d 1 -B "${TEST_DATA}/barcode_splitter_barcodes_fqmx.txt" -m 2 -M 2 -b "${TEST_DATA}/barcode_splitter1.fastq.gz" -o "${TEST_OUTPUT}/${TEST}_%-read-1.out.gz" 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
+EXIT_CODE=$?
+EXPECTED_EXIT_CODE=0
+check_test_results
+
+
 exit $EXIT_STATUS
