@@ -943,7 +943,7 @@ sub processSTDERR
     my $line = $ARG[0];
 
     #Echo errors out to STDERR
-    my $filter_pats = ['^Using Barcode File: ','End used: ','gzip: stdout: Broken pipe'];
+    my $filter_pats = ['^Using Barcode File: ','End used: ','gzip: stdout: Broken pipe','^\s*$'];
     my $filter_pat  = join('|',@$filter_pats);
 
     #Exit non-zero when fatal error is encountered (because fastq-multx doesn't)
