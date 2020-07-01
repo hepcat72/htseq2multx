@@ -1,0 +1,1 @@
+ERROR: Unable to open barcode file: [Errno 2] No such file or directory: 'baddir/barcode_splitter_barcodes.txt'

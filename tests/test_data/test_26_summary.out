@@ -1,0 +1,7 @@
+Id	Count	File(s)
+BC1	5	test_output/test_26_BC1-read-1.out.gz
+BC2	12	test_output/test_26_BC2-read-1.out.gz
+BC3	9	test_output/test_26_BC3-read-1.out.gz
+BC4	1	test_output/test_26_BC4-read-1.out.gz
+unmatched	15	test_output/test_26_unmatched-read-1.out.gz
+total	42

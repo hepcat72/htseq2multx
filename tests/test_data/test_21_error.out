@@ -1,0 +1,9 @@
+WARNING: More than one barcode matches @CSHL_3_FC042AGLLWW:1:2:7:203, moving to multimatched category
+WARNING: More than one barcode matches @CSHL_3_FC042AGLLWW:1:2:7:203, moving to multimatched category
+WARNING: More than one barcode matches @CSHL_3_FC042AGLLWW:1:2:7:203, moving to multimatched category
+WARNING: More than one barcode matches @CSHL_3_FC042AGLLWW:1:2:7:203, moving to multimatched category
+WARNING: More than one barcode matches @CSHL_3_FC042AGLLWW:1:2:7:203, moving to multimatched category
+WARNING: More than one barcode matches @CSHL_3_FC042AGLLWW:1:2:7:203, moving to multimatched category
+ERROR: Index ID mismatch: @CSHL_3_FC042AGLLWW:1:2:7:203/2 does not match @CSHL_3_FC042AGLLWW:1:2:7:203/1
+ERROR: Index ID mismatch: @HWI-X00000:2:000000000-XXXXX:1:1117:19643:1028 3:N:0: does not match @HWI-X00000:2:000000000-XXXXX:1:1117:19643:1028 1:N:0:
+ERROR: Unrecognized character found in sample table output.  Set the PYTHONIOENCODING (e.g. to 'UTF-8') as an environment variable and run again, or edit your barcode file to use only ASCII characters.
