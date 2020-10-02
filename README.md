@@ -24,7 +24,7 @@ This repo contains the details necessary to install the htseq2multx's module dep
 
 ### Local/user-account install
 
-    git clone https://github.com/hepcat72/split-seq-processing.git
+    git clone https://github.com/hepcat72/htseq2multx.git
     cd htseq2multx
     perl Makefile.PL INSTALL_BASE=~
     make
