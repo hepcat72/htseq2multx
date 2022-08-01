@@ -8,9 +8,12 @@ use IO::Select;
 use English qw(-no_match_vars);
 use Readonly;
 
-our $VERSION     = '0.1';    #Version of this script
+our $VERSION     = '0.2';    #Version of this script
 our $BCSVERSION  = '0.18.6'; #Emulated barcode_splitter version
 our $FQMXVERSION = '1.4';    #Minimum required fastq-multx version
+
+# CHANGE LOG
+# 0.2 Added fatal error: Returning error because of i/o error during file close
 
 #Exit codes (mimmicking barcode_splitter)
 Readonly::Scalar my $SUCCESS         => 0;
@@ -947,10 +950,11 @@ sub processSTDERR
     my $filter_pat  = join('|',@$filter_pats);
 
     #Exit non-zero when fatal error is encountered (because fastq-multx doesn't)
-    my $fatal_pats  = ['Error: number of input files \(\d+\) must match ' .
-                       'number of output files',
-                       'No such file or directory'];
-    my $fatal_pat   = join('|',@$fatal_pats);
+    my $fatal_pats =
+      ['Error: number of input files \(\d+\) must match number of output files',
+       'No such file or directory',
+       'Returning error because of i\/o error during file close'];
+    my $fatal_pat = join('|',@$fatal_pats);
 
     unless($line =~ /$filter_pat/i)
       {print STDERR ($line)}
