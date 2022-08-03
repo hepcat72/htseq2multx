@@ -23,6 +23,7 @@ Readonly::Scalar my $OPEN_OUT_ERROR  => 6;
 Readonly::Scalar my $OUTFILES_EXIST  => 9;
 Readonly::Scalar my $FQIN_OPEN_ERROR => 10;
 Readonly::Scalar my $DUPE_BC_ROWS    => 12;
+Readonly::Scalar my $FQMX_ERROR_CODE => 13;
 
 #Number of fastq lines at which to give up trying to set the defline separator
 Readonly::Scalar my $FORMAT_DETECT_LINE_MAX => 100;
@@ -185,18 +186,22 @@ sub processOptions
     my $supported_version                 = [split(/\./,$FQMXVERSION)];
     if($problem =~ /./)
       {
+        help();
         help2();
-        print('ERROR: There is a problem with the fastq-multx executable: ',
-              "[$problem].  Use the --fastq-multx option described above to ",
-              "supply fastq-multx if it is missing from your PATH.\n");
+        print STDERR ('ERROR: There is a problem with the fastq-multx ',
+                      "executable: [$problem].  Use the --fastq-multx option ",
+                      'described above to supply fastq-multx if it is ',
+                      "missing from your PATH.\n");
         exit($GENERIC_ERROR);
       }
     elsif(!$is_fqmx)
       {
+        help();
         help2();
-        print('ERROR: The fastq-multx executable appears to not be fastq-',
-              'multx according to the first 2 lines of its usage.  Use the ',
-              "--fastq-multx option described above to supply fastq-multx.\n");
+        print STDERR ('ERROR: The fastq-multx executable appears to not be ',
+                      'fastq-multx according to the first 2 lines of its ',
+                      'usage.  Use the --fastq-multx option described above/',
+                      "below to supply fastq-multx.\n");
         exit($GENERIC_ERROR);
       }
     elsif(fqmxVersionInsufficient($multx_version,$supported_version))
@@ -435,7 +440,7 @@ sub runFastqMultx
     my $command = $ARG[0];
 
     my $producer = IO::Pipe::Producer->new();
-    my($stdout_handle,$stderr_handle) = $producer->getSystemProducer($command);
+    my($stdout_handle,$stderr_handle,$pid) = $producer->getSystemProducer($command);
 
     my $sel = IO::Select->new();
     $sel->add($stdout_handle,$stderr_handle);
@@ -462,15 +467,25 @@ sub runFastqMultx
           }
       }
 
-    if($CHILD_ERROR || $make_error_fatal)
+    waitpid($pid, 0);
+    my $exit_code = $CHILD_ERROR >> 8;
+
+    if($exit_code)
       {
-        print STDERR ("ERROR: fastq-multx command failed",
-                      ($CHILD_ERROR ? ' with a non-zero exit code ' .
-                       "[$CHILD_ERROR]" .
-                       ($OS_ERROR =~ /./ ? " and error: $OS_ERROR" : '.') :
-                       ':'),"\n\t$command\n");
-        unless($stdout =~ /\t/)
-          {exit($GENERIC_ERROR)}
+        print STDERR ('ERROR: fastq-multx command failed with a non-zero ',
+                      "exit code [$exit_code]",
+                      ($OS_ERROR =~ /./ ? " and error: [$OS_ERROR]" : ''),
+                      ":\n$command\n");
+
+        #Exit this script indicating an error with the fastq-multx executable
+        exit($FQMX_ERROR_CODE);
+      }
+    #Or exit non-zero if one of the make_error_fatal patterns matched the
+    #STDERR output and STDOUT has no tab characters.
+    elsif($make_error_fatal && $stdout !~ /\t/)
+      {
+        print STDERR ("ERROR: fastq-multx command failed:\n$command\n");
+        exit($GENERIC_ERROR);
       }
 
     print(fqmx2bcsStdout($stdout,scalar(@$idxread)));

@@ -363,11 +363,28 @@ echo -e "\033[1;33mSKIPPING\033[0m $TEST"
 # Test that "Returning error because of i/o error during file close" is fatal
 TEST=test_27
 rm -f ${TEST_OUTPUT}/${TEST}_* 2> /dev/null
-OUTPUTS=""
-NOT_OUTPUTS="summary.out error.out"
-$BARCODE_SPLITTER --fast-multx ./simulate_multx_error_test_27.pl --mismatches 2 --gzipin --gzipout --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" <(cat "${TEST_DATA}/barcode_splitter1.fastq.gz") --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.out 1> ${TEST_OUTPUT}/${TEST}_summary.out
+OUTPUTS="summary.out error.out"
+NOT_OUTPUTS=""
+$BARCODE_SPLITTER --fastq-multx ./simulate_multx_error_test_27.pl --mismatches 2 --gzipin --gzipout --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" <(cat "${TEST_DATA}/barcode_splitter1.fastq.gz") --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.tmp 1> ${TEST_OUTPUT}/${TEST}_summary.out
 EXIT_CODE=$?
+# Remove the line with the command because it uses a random number in the output file names
+grep -v simulate_multx_error_test_27 ${TEST_OUTPUT}/${TEST}_error.tmp > ${TEST_OUTPUT}/${TEST}_error.out
+rm -f ${TEST_OUTPUT}/${TEST}_error.tmp
 EXPECTED_EXIT_CODE=1
+check_test_results
+
+
+# Test that a non-zero exit code is fatal
+TEST=test_28
+rm -f ${TEST_OUTPUT}/${TEST}_* 2> /dev/null
+OUTPUTS="summary.out error.out"
+NOT_OUTPUTS=""
+$BARCODE_SPLITTER --fastq-multx ./simulate_multx_non0_test_28.pl --mismatches 2 --gzipin --gzipout --bcfile "${TEST_DATA}/barcode_splitter_barcodes.txt" <(cat "${TEST_DATA}/barcode_splitter1.fastq.gz") --prefix "${TEST_OUTPUT}/${TEST}_" --suffix .out --idxread 1 --split_all $DEBUG_OPT 2> ${TEST_OUTPUT}/${TEST}_error.tmp 1> ${TEST_OUTPUT}/${TEST}_summary.out
+EXIT_CODE=$?
+# Remove the line with the command because it uses a random number in the output file names
+grep -v simulate_multx_non0_test_28 ${TEST_OUTPUT}/${TEST}_error.tmp > ${TEST_OUTPUT}/${TEST}_error.out
+rm -f ${TEST_OUTPUT}/${TEST}_error.tmp
+EXPECTED_EXIT_CODE=13
 check_test_results
 
 

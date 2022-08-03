@@ -1,0 +1,2 @@
+Returning error because of i/o error during file close
+ERROR: fastq-multx command failed:

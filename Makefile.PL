@@ -23,7 +23,7 @@ WriteMakefile
 			 'with Princeton\'s HTSEQ web interface.'))) : ()),
 
    VERSION_FROM => "$scripts[0]",
-   PREREQ_PM    => {'IO::Pipe::Producer'     => 2.01,
+   PREREQ_PM    => {'IO::Pipe::Producer'     => 2.02,
                     'IO::Select'             => 1.21,
                     'IO::Uncompress::Gunzip' => '2.060',
                     'Getopt::Long'           => 2.38,
