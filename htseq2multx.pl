@@ -8,9 +8,12 @@ use IO::Select;
 use English qw(-no_match_vars);
 use Readonly;
 
-our $VERSION     = '0.1';    #Version of this script
+our $VERSION     = '0.2';    #Version of this script
 our $BCSVERSION  = '0.18.6'; #Emulated barcode_splitter version
 our $FQMXVERSION = '1.4';    #Minimum required fastq-multx version
+
+# CHANGE LOG
+# 0.2 Added fatal error: Returning error because of i/o error during file close
 
 #Exit codes (mimmicking barcode_splitter)
 Readonly::Scalar my $SUCCESS         => 0;
@@ -20,6 +23,7 @@ Readonly::Scalar my $OPEN_OUT_ERROR  => 6;
 Readonly::Scalar my $OUTFILES_EXIST  => 9;
 Readonly::Scalar my $FQIN_OPEN_ERROR => 10;
 Readonly::Scalar my $DUPE_BC_ROWS    => 12;
+Readonly::Scalar my $FQMX_ERROR_CODE => 13;
 
 #Number of fastq lines at which to give up trying to set the defline separator
 Readonly::Scalar my $FORMAT_DETECT_LINE_MAX => 100;
@@ -182,18 +186,22 @@ sub processOptions
     my $supported_version                 = [split(/\./,$FQMXVERSION)];
     if($problem =~ /./)
       {
+        help();
         help2();
-        print('ERROR: There is a problem with the fastq-multx executable: ',
-              "[$problem].  Use the --fastq-multx option described above to ",
-              "supply fastq-multx if it is missing from your PATH.\n");
+        print STDERR ('ERROR: There is a problem with the fastq-multx ',
+                      "executable: [$problem].  Use the --fastq-multx option ",
+                      'described above to supply fastq-multx if it is ',
+                      "missing from your PATH.\n");
         exit($GENERIC_ERROR);
       }
     elsif(!$is_fqmx)
       {
+        help();
         help2();
-        print('ERROR: The fastq-multx executable appears to not be fastq-',
-              'multx according to the first 2 lines of its usage.  Use the ',
-              "--fastq-multx option described above to supply fastq-multx.\n");
+        print STDERR ('ERROR: The fastq-multx executable appears to not be ',
+                      'fastq-multx according to the first 2 lines of its ',
+                      'usage.  Use the --fastq-multx option described above/',
+                      "below to supply fastq-multx.\n");
         exit($GENERIC_ERROR);
       }
     elsif(fqmxVersionInsufficient($multx_version,$supported_version))
@@ -432,7 +440,7 @@ sub runFastqMultx
     my $command = $ARG[0];
 
     my $producer = IO::Pipe::Producer->new();
-    my($stdout_handle,$stderr_handle) = $producer->getSystemProducer($command);
+    my($stdout_handle,$stderr_handle,$pid) = $producer->getSystemProducer($command);
 
     my $sel = IO::Select->new();
     $sel->add($stdout_handle,$stderr_handle);
@@ -459,15 +467,25 @@ sub runFastqMultx
           }
       }
 
-    if($CHILD_ERROR || $make_error_fatal)
+    waitpid($pid, 0);
+    my $exit_code = $CHILD_ERROR >> 8;
+
+    if($exit_code)
       {
-        print STDERR ("ERROR: fastq-multx command failed",
-                      ($CHILD_ERROR ? ' with a non-zero exit code ' .
-                       "[$CHILD_ERROR]" .
-                       ($OS_ERROR =~ /./ ? " and error: $OS_ERROR" : '.') :
-                       ':'),"\n\t$command\n");
-        unless($stdout =~ /\t/)
-          {exit($GENERIC_ERROR)}
+        print STDERR ('ERROR: fastq-multx command failed with a non-zero ',
+                      "exit code [$exit_code]",
+                      ($OS_ERROR =~ /./ ? " and error: [$OS_ERROR]" : ''),
+                      ":\n$command\n");
+
+        #Exit this script indicating an error with the fastq-multx executable
+        exit($FQMX_ERROR_CODE);
+      }
+    #Or exit non-zero if one of the make_error_fatal patterns matched the
+    #STDERR output and STDOUT has no tab characters.
+    elsif($make_error_fatal && $stdout !~ /\t/)
+      {
+        print STDERR ("ERROR: fastq-multx command failed:\n$command\n");
+        exit($GENERIC_ERROR);
       }
 
     print(fqmx2bcsStdout($stdout,scalar(@$idxread)));
@@ -947,10 +965,11 @@ sub processSTDERR
     my $filter_pat  = join('|',@$filter_pats);
 
     #Exit non-zero when fatal error is encountered (because fastq-multx doesn't)
-    my $fatal_pats  = ['Error: number of input files \(\d+\) must match ' .
-                       'number of output files',
-                       'No such file or directory'];
-    my $fatal_pat   = join('|',@$fatal_pats);
+    my $fatal_pats =
+      ['Error: number of input files \(\d+\) must match number of output files',
+       'No such file or directory',
+       'Returning error because of i\/o error during file close'];
+    my $fatal_pat = join('|',@$fatal_pats);
 
     unless($line =~ /$filter_pat/i)
       {print STDERR ($line)}
